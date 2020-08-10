@@ -41,7 +41,7 @@ class Order(BaseModel):
         )
 
     user = models.ForeignKey("users.User", related_name="orders", on_delete=models.CASCADE, verbose_name="下订单的用户编号")
-    house = models.ForeignKey("homes.House", on_delete=models.CASCADE, verbose_name="预订的房间编号")
+    house = models.ForeignKey("house.House", on_delete=models.CASCADE, verbose_name="预订的房间编号")
     begin_date = models.DateField(null=False, verbose_name="预订的起始时间")
     end_date = models.DateField(null=False, verbose_name="结束时间")
     days = models.IntegerField(null=False, verbose_name="预订的总天数")
@@ -51,4 +51,4 @@ class Order(BaseModel):
     comment = models.TextField(null=True, verbose_name="订单的评论信息或者拒单原因")
 
     class Meta:
-        db_table = "tb_order"
+        db_table ="tb_order"
