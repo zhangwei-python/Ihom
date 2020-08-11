@@ -8,7 +8,7 @@ from django.shortcuts import render
 
 import json
 
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.shortcuts import render
 
@@ -143,6 +143,7 @@ class RegisterView(View):
             user=User.objects.create_user(
                 username=mobile,
                 # phonecode=phonecode,
+                mobile=mobile,
                 password=password,
             )
         except Exception as e:
@@ -174,7 +175,22 @@ class Lgogin(View):
         if user is None:
             return JsonResponse({'errno':'4105','errmsg':'用户身份错误'})
         login(request,user)
-        return JsonResponse({'errno':0,'errmsg':'成功'})
+        response=JsonResponse({'errno':0,'errmsg':'成功'})
+        response.set_cookie('mobile',mobile,max_age=3600*24*14)
+        return response
+
+
+
+    def delete(self,request):
+        """退出登录"""
+        logout(request)
+        response=JsonResponse({
+            "errno": "0",
+            "errmsg": "已登出"
+        })
+        response.delete_cookie('mobile')
+        return response
+
 
     @method_decorator(login_required)
     def get(self,request):

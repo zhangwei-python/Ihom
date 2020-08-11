@@ -1,8 +1,5 @@
-from django.shortcuts import render
-
-# Create your views here.
 import json
-from django.http import JsonResponse
+from django.http import JsonResponse,HttpResponseRedirect
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -17,13 +14,12 @@ from Ihome.utils.view import login_required
 
 # 添加订单
 
-class AddOrderView(View):
+class CustomOrderView(View):
     def post(self, request):
-
         # get data
         data = json.loads(request.body.decode())
-        # house_id = data.get('house_id')
-        house_id = 6
+        house_id = data.get('house_id')
+        #house_id = 6
         start_date = data.get('start_date')
         end_date = data.get('end_date')
         # judge data
@@ -60,23 +56,23 @@ class AddOrderView(View):
         start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
         end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
 
-        if (bd <= start_date <= ed) or (bd <= end_date <= ed):
+        if ((bd <= start_date <= ed) or (bd <= end_date <= ed)) and():
             return JsonResponse({
                 'errno': 400,
                 'errmsg': '房间已被预定'
             })
         count_day = (end_date - start_date).days
         house_prices = house.price,
-        house_price= house_prices[0]
+        house_price = house_prices[0]
         count_price = house_price * count_day
         try:
             Order.objects.create(
                 begin_date=start_date,
                 end_date=end_date,
                 days=count_day,
-                house_price= house_price,
-                amount= count_price,
-                status= True,
+                house_price=house_price,
+                amount=count_price,
+                status=0,
                 house_id=house_id,
                 user_id=user.id
             )
@@ -87,7 +83,7 @@ class AddOrderView(View):
                 "errmsg": "数据写入失败",
             })
 
-        order_id = Order.objects.get(user_id=user.id,house_id=house_id,begin_date=start_date).id
+        order_id = Order.objects.get(user_id=user.id, house_id=house_id, begin_date=start_date).id
         return JsonResponse({
             "errno": "0",
             "errmsg": "下单成功",
@@ -95,94 +91,134 @@ class AddOrderView(View):
         })
 
     def get(self, request):
-
         role = request.GET.get('role')
-        if role == 'landlord':
-            return JsonResponse({
-                'code': '400',
-                'errmsg': '无法获取房客信息',
-            })
         user = request.user
-        my_order = Order.objects.filter(user_id=user.id,)
-        orders_list = []
-        for orders in my_order:
+        if role == 'custom':
+            my_order = Order.objects.filter(user_id=user.id, )
+            orders_list = []
+            for orders in my_order:
+                orders_list.append({
+                    "amount": orders.amount,
+                    "comment": orders.comment,
+                    "ctime": orders.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "days": orders.days,
+                    "end_date": orders.end_date.strftime("%Y-%m-%d"),
+                    "img_url": "http://oyucyko3w.bkt.clouddn.com/FhgvJiGF9Wfjse8ZhAXb_pYObECQ",
+                    "order_id": orders.id,
+                    "start_date": orders.begin_date.strftime("%Y-%m-%d"),
+                    "status": orders.status,  # 前端order.html修改响应order.status（0-待接单/1-待评价/2-已完成/3-已拒单）
+                    "title": House.objects.get(id=orders.house_id).title
+                })
+            return JsonResponse({
+                "data": {
+                    "orders": orders_list
+                },
+                "errmsg": "OK",
+                "errno": "0"
+            })
 
-            orders_list.append({
-                "amount": orders.amount,
-                "comment": orders.comment,
-                "ctime": orders.create_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "days": orders.days,
-                "end_date": orders.end_date.strftime("%Y-%m-%d"),
-                "img_url": "http://oyucyko3w.bkt.clouddn.com/FhgvJiGF9Wfjse8ZhAXb_pYObECQ",
-                "order_id": orders.id,
-                "start_date": orders.begin_date.strftime("%Y-%m-%d"),
-                "status": "COMPLETE",#orders.status,
-                "title":  House.objects.get(id=orders.house_id).title
+        elif role == 'landlord':
+            my_house = House.objects.filter(user_id=user.id)
+            orders_list = []
+            for house in my_house:
+                my_order = Order.objects.filter(house_id=house.id)
+                for orders in my_order:
+                    orders_list.append({
+                        "amount": orders.amount,
+                        "comment": orders.comment,
+                        "ctime": orders.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "days": orders.days,
+                        "end_date": orders.end_date.strftime("%Y-%m-%d"),
+                        "img_url": "http://oyucyko3w.bkt.clouddn.com/FhgvJiGF9Wfjse8ZhAXb_pYObECQ",
+                        "order_id": orders.id,
+                        "start_date": orders.begin_date.strftime("%Y-%m-%d"),
+                        "status": orders.status,  # 前端order.html和lorder.html修改响应order.status（0-待接单/1-待评价/2-已完成/3-已拒单）
+                        "title": House.objects.get(id=orders.house_id).title
+                    })
+            return JsonResponse({
+                "data": {
+                    "orders": orders_list
+                },
+                "errmsg": "OK",
+                "errno": "0"
             })
 
 
-        return JsonResponse({
-            "data": {
-                "orders": orders_list
-            },
-            "errmsg": "OK",
-            "errno": "0"
-        })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class MyHouseOrderView(View):
-    def put(self,request):
+class LandlOrderView(View):
+    def put(self, request, order_id):
         user = request.user
         data = json.loads(request.body.decode())
         action = data.get('action')
-        order_id = data.get('order_id')     # //
-
-        order_db = Order.objects.get(id=order_id) # //
+        reason = data.get('reason')
+        print(order_id)
+        order = Order.objects.get(id=order_id)
         if action == 'accept':
-            status = request.GET.get('status')
-            if status == 1:
-                return JsonResponse({
-                    "errno": "0",
-                    "errmsg": "取消接单"
-                })
-            elif status == 2:
-                order_db.status = 2,
-                order_db.save()
+            order.status = 1
+            order.save()
+            house = House.objects.get(id=order.house_id)
+            h_room = house.room_count
+
+            if h_room > 0:
+                try:
+                    house.room_count = h_room - 1
+                    house.order_count = house.order_count + 1
+                    house.save()
+                except Exception as e:
+                    print(e)
+                    return JsonResponse({
+                        "errno": "400",
+                        "errmsg": "操作失败"
+                    })
                 return JsonResponse({
                     "errno": "0",
                     "errmsg": "操作成功"
                 })
+            elif h_room == 0:
+                return JsonResponse({
+                    "errno": "400",
+                    "errmsg": "房源不足"
+                })
         elif action == 'reject':
-            reason = request.GET.get('reason')
-            order_db.comment = reason
-            order_db.save()
+            try:
+                order.status = 3
+                order.comment = reason
+                order.save()
+            except Exception as e:
+                print(e)
+                return JsonResponse({
+                    "errno": "400",
+                    "errmsg": "操作失败"
+                })
             return JsonResponse({
                 "errno": "0",
                 "errmsg": "操作成功"
             })
 
-class UserCommitView(View):
-    def put(self,request):
-        comment = request.GET.get('comment')
 
-        order_id = comment.get('order_id')  # //
-        oeder_commit = Order.objects.get(order_id=order_id)
-        oeder_commit.comment =comment
-        oeder_commit.save()
+# 前端order.html修改响应order.status（0-待接单/1-待评价/2-已完成/3-已拒单）
+class CommitOrderView(View):
+    def put(self,request,order_id):
+        data = json.loads(request.body.decode())
+        comment = data.get('comment')
+        if not comment.strip():
+            return JsonResponse({
+                {
+                    "errno": "400",
+                    "errmsg": "评论内容不能为空"
+                }
+            })
+        oeder = Order.objects.get(id=order_id)
+        try:
+            oeder.comment = comment
+            oeder.status = 2
+            oeder.save()
+        except Exception as e:
+            print(e)
+            return JsonResponse({
+                "errno": "400",
+                "errmsg": "评论失败"
+            })
         return JsonResponse({
             "errno": "0",
             "errmsg": "评论成功"
         })
-

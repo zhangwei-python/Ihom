@@ -179,7 +179,7 @@ class MyHouseList(View):
                 "area_name": house.area.name,
                 "ctime": house.create_time,
                 "house_id": house.id,
-                "img_url": "http://oyucyko3w.bkt.clouddn.com/FhxrJOpjswkGN2bUgufuXPdXcV6w",
+                "img_url": str(house.index_image_url),
                 "order_count": house.order_count,
                 "price": house.price,
                 "room_count": house.room_count,
@@ -245,3 +245,78 @@ class House_recommend(View):
 
 
 
+
+
+
+
+
+class HouseIndexView(View):
+    """房屋详情页"""
+    def get(self,request,house_id):
+        try:
+            house=House.objects.get(pk=house_id)
+
+        except Exception as e:
+            return  JsonResponse({
+                "errno": "400",
+                "errmsg": "数据库错误",
+            })
+
+        #获取订单评论
+        comment_list=[]
+        orders=Order.objects.filter(house_id=house_id)
+        for order in orders:
+            comment_list.append(
+                {
+                    'comment':order.comment,
+                    "ctime": order.create_time,
+                    "user_name": order.user.username
+                }
+            )
+        #设施列表
+        facility_list=[]
+        try:
+            facilities=house.facility.all()
+            print(facilities)
+            for facility in facilities:
+                facility_list.append(facility.id)
+        except Exception as e:
+            print(e)
+
+        # facilities=H
+
+        #图片地址
+        image_url_list=[]
+        house_images=HouseImage.objects.filter(house_id=house_id)
+        for house_image in house_images:
+            image_url_list.append(str(house_image.url))
+
+
+        return JsonResponse({
+            "data": {
+                "house": {
+                    "acreage": house.acreage,
+                    "address": house.address,
+                    "beds": house.beds,
+                    "capacity": house.capacity,
+                    "comments": comment_list,
+                    "deposit": house.deposit,
+                    "facilities": facility_list,
+
+                    "hid": house.id,
+                    "img_urls": image_url_list,
+                    "max_days": house.max_days,
+                    "min_days": house.min_days,
+                    "price": house.price,
+                    "room_count": house.room_count,
+                    "title": house.title,
+                    "unit": house.unit,
+                    "user_avatar": str(house.user.avatar),
+                    "user_id": house.user_id,
+                    "user_name": house.user.username
+                },
+                "user_id": request.user.id
+            },
+            "errmsg": "OK",
+            "errno": "0"
+        })
